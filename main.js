@@ -14,6 +14,8 @@ var hardTargetHits;
 var points;
 var isGameOver;
 
+var showingHelp;
+
 function Run() {
 	window.addEventListener("keydown", keyListener);
 	initGame();
@@ -43,6 +45,12 @@ function keyListener (event) {
 	case "r":
 		initGame();
 		return;
+	case "h":
+		showingHelp = true;
+		return;
+	case "Escape":
+		showingHelp = false;
+		return;
 	default:
 		return;
 	}
@@ -60,22 +68,23 @@ function gameLoop() {
 
 	let pointString = `Points: ${points}`;
 	ctx.fillStyle = "rgb(255,255,255)";
-	ctx.font = "18px Arial";
-	ctx.fillText(pointString, 925, 30);
+	ctx.font = "18px Courier";
+	ctx.fillText(pointString, 905, 30);
+
+	showhelp: {
+		if (!showingHelp) {
+			break showhelp;
+		}
+
+		showHelp(ctx);
+	}
 
 	gameover: {
 		if (!isGameOver) {
 			break gameover;
 		}
 
-		// show game over screen and option to restart
-		ctx.fillStyle = "rgb(255,0,0)";
-		ctx.font = "bold 30px Arial";
-		ctx.fillText("Game Over!", 450, 360);
-
-		ctx.fillStyle = "rgb(0, 255, 0)";
-		ctx.font = "18px Arial"
-		ctx.fillText("(Press 'R' to restart)", 455, 380);
+		showGameOver(ctx);
 	}
 
 
@@ -256,6 +265,35 @@ function initGame() {
 
 	points = 0;
 	isGameOver = false;
+}
+
+function showHelp(ctx) {
+	ctx.fillStyle = "rgb(0,0,255)";
+	ctx.fillRect(400,230,250,200);
+	ctx.strokeStyle = "rgb(255,255,255)";
+	ctx.strokeRect(400, 230, 250, 200);
+
+	ctx.fillStyle = "rgb(255,255,255)";
+	ctx.font = "bold 18px Courier";
+	ctx.fillText("Controls", 480, 250);
+
+	ctx.font = "18px Courier";
+	ctx.fillText("UP    : Up Arrow", 425, 290);
+	ctx.fillText("DOWN  : Down Arrow", 425, 315);
+	ctx.fillText("LEFT  : Left Arrow", 425, 340);
+	ctx.fillText("RIGHT : Right Arrow", 425, 365);
+	ctx.fillText("SHOOT : Spacebar", 425, 390);
+}
+
+function showGameOver(ctx) {
+	// show game over screen and option to restart
+	ctx.fillStyle = "rgb(255,0,0)";
+	ctx.font = "bold 30px Courier";
+	ctx.fillText("Game Over!", 450, 360);
+
+	ctx.fillStyle = "rgb(0, 255, 0)";
+	ctx.font = "18px Courier"
+	ctx.fillText("(Press 'R' to restart)", 455, 380);
 }
 
 Run();
