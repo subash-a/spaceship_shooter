@@ -4,6 +4,7 @@ const MIN_X = 10;
 const MAX_X = 994;
 const MIN_Y = 10;
 const MAX_Y = 738;
+const ENEMY_SHIP_SPEED = 1;
 
 var currX, currY;
 
@@ -21,6 +22,7 @@ var hardEnemyMissiles;
 var points;
 var isLevel1Complete;
 var isLevel2Complete;
+var isLevel3Complete;
 var isGameOver;
 
 var showingHelp;
@@ -105,7 +107,7 @@ function gameLoop() {
 			break gameover;
 		}
 
-		showGameOver(ctx, isLevel2Complete);
+		showGameOver(ctx, isLevel1Complete && isLevel2Complete && isLevel3Complete);
 	}
 
 
@@ -237,7 +239,7 @@ function gameLoop() {
 			let missileX = missiles[i][0];
 			let missileY = missiles[i][1];
 
-			ctx.strokeStyle = "rgb(255,30,0)";
+			ctx.strokeStyle = "rgb(30,255,0)";
 			let p = new Path2D();
 			p.moveTo(missileX, missileY);
 			p.lineTo(missileX, missileY+20);
@@ -512,6 +514,280 @@ function gameLoop() {
 		if (easyTargetsDestroyed && hardTargetsDestroyed) {
 			isLevel2Complete = true;
 			console.log("Level 2 Complete");
+			initLevel3();
+			// isGameOver = true;
+		}
+
+	}
+
+	level3: {
+		if (isGameOver || !isLevel1Complete || !isLevel2Complete || isLevel3Complete) {
+			break level3;
+		}
+		// check for space ship colliding with any targets
+		let isSpaceShipColliding = false;
+		for(let i = 0; i < targetsEasy.length; i++) {
+			if (targetsEasy[i] === easyTargetHits) {
+				continue;
+			}
+
+			let x1 = 150*(i+1);
+			let x2 = x1 + 20;
+			let isXMatching = x1 < currX && currX < x2;
+
+			let y1 = 500;
+			let y2 = 500+20;
+			let isYMatching = y1 < currY && currY < y2;
+			if (isXMatching && isYMatching) {
+				isSpaceShipColliding = true;
+				break;
+			}
+		}
+
+		for(let i = 0; i < targetsHard.length; i++) {
+			if (targetsHard[i] === hardTargetHits) {
+				continue;
+			}
+
+			let x1 = 150*(i+1);
+			let x2 = x1 + 20;
+			let isXMatching = x1 < currX && currX < x2;
+
+			let y1 = 700;
+			let y2 = 700+20;
+			let isYMatching = y1 < currY && currY < y2;
+			if (isXMatching && isYMatching) {
+				isSpaceShipColliding = true;
+				break;
+			}
+		}
+
+		if (!isSpaceShipColliding) { // render spaceship it has not collided
+			ctx.beginPath();
+			ctx.moveTo(currX, currY);
+			ctx.lineTo(currX+20,currY+0);
+			ctx.lineTo(currX+10,currY+20);
+			ctx.lineTo(currX+0,currY+0);
+			ctx.closePath();
+			ctx.fillStyle = "rgb(255,255,255)";
+			ctx.fill();
+		} else {
+			isGameOver = true;
+		}
+
+		// check missile and target collision
+		let remainingMissiles = [];
+		for (let i = 0; i < missiles.length; i++) {
+			let missileX = missiles[i][0];
+			let missileY = missiles[i][1];
+
+			let isMissileOutOfView = missileY > canvas.height;  // has gone beyond the screen y-axis
+			if (isMissileOutOfView) {
+				continue; // we do not need this anymore
+			}
+
+			let hasMissileHitTarget = false;
+			for (let j = 0; j < targetsEasy.length; j++) {
+				if (targetsEasy[j] === easyTargetHits) {
+					continue; // if target is not rendered then it should not hit it, no check necessary
+				}
+
+				let rx1 = targetsEasyPosition[j][0]; // left x coord of rectangle
+				let rx2 = rx1+20; // left x coord + width
+
+				let isMissileInRange = rx1 < missileX && missileX < rx2; // missile is within x-axis bounds of target
+				if (!isMissileInRange) {
+					continue;
+				}
+
+				let ry1 = targetsEasyPosition[j][1]; // upper y coord of rectangle
+				let ry2 = ry1+20; // lower y coord of rectangle
+				let hasMissileCollided = ry1 < missileY && missileY < ry2;  // has collided with a target
+				if (!hasMissileCollided) {
+					continue;
+				}
+
+				targetsEasy[j] = targetsEasy[j] + 1;
+				hasMissileHitTarget = true;
+				break;
+			}
+
+			for (let j = 0; j < targetsHard.length; j++) {
+				if (targetsHard[j] === hardTargetHits) {
+					continue; // if target is not going to be rendered then hit check not needed
+				}
+
+				let rx1 = targetsHardPosition[j][0]; // left x coord of rectangle
+				let rx2 = rx1+20; // left x coord + width
+
+				let isMissileInRange = rx1 < missileX && missileX < rx2; // missile is within x-axis bounds of target
+				if (!isMissileInRange) {
+					continue;
+				}
+
+				let ry1 = targetsHardPosition[j][1];
+				let ry2 = ry1+20;
+				let hasMissileCollided = ry1 < missileY && missileY < ry2;  // has collided with a target
+				if (!hasMissileCollided) {
+					continue;
+				}
+
+				targetsHard[j] = targetsHard[j] + 1;
+				hasMissileHitTarget = true;
+				break;
+			}
+
+			if (hasMissileHitTarget) {
+				points = points + 1;
+				continue;
+			}
+
+			remainingMissiles.push([missileX, missileY+5]); // keep missile
+		}
+
+		// check enemy ship missile and space ship collision
+		let remainingEasyEnemyMissiles = [];
+		let remainingHardEnemyMissiles = [];
+		let spaceShipXLeftBound = currX-10;
+		let spaceShipXRightBound = currX+10;
+		let spaceShipYLowerBound = currY+10;
+		let spaceShipYUpperBound = currY-10;
+		for (let i = 0; i < easyEnemyMissiles.length; i++) {
+			let missileX = easyEnemyMissiles[i][0];
+			let missileY = easyEnemyMissiles[i][1];
+			let missileWithinXBounds = spaceShipXLeftBound < missileX && missileX < spaceShipXRightBound;
+			let missileWithinYBounds = spaceShipYUpperBound < missileY && missileY < spaceShipYLowerBound;
+
+			if (missileWithinXBounds && missileWithinYBounds) {
+				// remove the missile and destroy the spaceship and set game over
+				isGameOver = true;
+				break;
+			}
+
+			let targetStillExists = targetsEasy[i] < easyTargetHits;
+			if (missileY < 0 && targetStillExists) { // create a new missile in its place
+				let currShipX = targetsEasyPosition[i][0];
+				let currShipY = targetsEasyPosition[i][1];
+				remainingEasyEnemyMissiles.push([currShipX, currShipY]);
+				continue;
+			}
+			// it is not colliding
+			remainingEasyEnemyMissiles.push([missileX, missileY-5]);
+		}
+
+		for (let i = 0; i < hardEnemyMissiles.length; i++) {
+			let missileX = hardEnemyMissiles[i][0];
+			let missileY = hardEnemyMissiles[i][1];
+			let missileWithinXBounds = spaceShipXLeftBound < missileX && missileX < spaceShipXRightBound;
+			let missileWithinYBounds = spaceShipYUpperBound < missileY && missileY < spaceShipYLowerBound;
+
+			if (missileWithinXBounds && missileWithinYBounds) {
+				// remove the missile and destroy the spaceship and set game over
+				isGameOver = true;
+				break;
+			}
+
+			let targetStillExists = targetsHard[i] < hardTargetHits;
+			if (missileY < 0 && targetStillExists) { // create a new missile in its place
+				let currShipX = targetsHardPosition[i][0];
+				let currShipY = targetsHardPosition[i][1];
+				remainingHardEnemyMissiles.push([currShipX, currShipY]);
+				continue;
+			}
+			// it is not colliding
+			remainingHardEnemyMissiles.push([missileX, missileY-5]);
+		}
+
+		// draw remaining missiles
+		missiles = remainingMissiles;
+		for (let i = 0; i < missiles.length; i++) {
+			let missileX = missiles[i][0];
+			let missileY = missiles[i][1];
+
+			ctx.strokeStyle = "rgb(30,255,0)";
+			let p = new Path2D();
+			p.moveTo(missileX, missileY);
+			p.lineTo(missileX, missileY+20);
+			ctx.stroke(p);
+		}
+
+		// draw remaining targets
+		let easyTargetsDestroyed = targetsEasy.every(v => v === easyTargetHits);
+		for (let i = 0; i < targetsEasy.length; i++) {
+			if (targetsEasy[i] === easyTargetHits) {
+				continue;
+			}
+
+			let x = targetsEasyPosition[i][0];
+			let y = targetsEasyPosition[i][1];
+
+			let dir = targetsEasyPosition[i][2];
+			let newTargetXPos = x + (dir*ENEMY_SHIP_SPEED);
+			let newTargetYPos = y + (-dir*ENEMY_SHIP_SPEED);
+			let newDir = dir;
+			if (newTargetXPos > MAX_X || newTargetYPos < MIN_Y || newTargetXPos < MIN_X || newTargetYPos > MAX_Y) {
+				newDir = -dir;
+			}
+			targetsEasyPosition[i] = [newTargetXPos, newTargetYPos, newDir];
+
+			ctx.fillStyle = "rgb(0, 0, 255)";
+			let p = new Path2D();
+			p.rect(newTargetXPos, newTargetYPos, 20, 20);
+			ctx.fill(p);
+		}
+
+		// draw remanining enemy missiles
+		easyEnemyMissiles = remainingEasyEnemyMissiles
+		for (let i = 0; i < easyEnemyMissiles.length; i++) {
+			let missileX = easyEnemyMissiles[i][0];
+			let missileY = easyEnemyMissiles[i][1];
+
+			ctx.strokeStyle = "rgb(255,30,0)";
+			let p = new Path2D();
+			p.moveTo(missileX, missileY);
+			p.lineTo(missileX, missileY+20);
+			ctx.stroke(p);
+		}
+
+		let hardTargetsDestroyed = targetsHard.every(v => v === hardTargetHits);
+		for (let i = 0; i < targetsHard.length; i++) {
+			if (targetsHard[i] === hardTargetHits) {
+				continue;
+			}
+
+			let x = targetsHardPosition[i][0];
+			let y = targetsHardPosition[i][1];
+
+			let dir = targetsHardPosition[i][2];
+			let newTargetXPos = x + (dir*ENEMY_SHIP_SPEED);
+			let newTargetYPos = y + (-dir*ENEMY_SHIP_SPEED);
+			let newDir = dir;
+			if (newTargetXPos > MAX_X || newTargetYPos < MIN_Y || newTargetXPos < MIN_X || newTargetYPos > MAX_Y) {
+				newDir = -dir;
+			}
+			targetsHardPosition[i] = [newTargetXPos, newTargetYPos, newDir];
+
+			ctx.fillStyle = "rgb(255, 0, 0)";
+			let p = new Path2D();
+			p.rect(newTargetXPos, newTargetYPos, 20, 20);
+			ctx.fill(p);
+		}
+
+		hardEnemyMissiles = remainingHardEnemyMissiles
+		for (let i = 0; i < hardEnemyMissiles.length; i++) {
+			let missileX = hardEnemyMissiles[i][0];
+			let missileY = hardEnemyMissiles[i][1];
+
+			ctx.strokeStyle = "rgb(255,30,0)";
+			let p = new Path2D();
+			p.moveTo(missileX, missileY);
+			p.lineTo(missileX, missileY+20);
+			ctx.stroke(p);
+		}
+
+		if (easyTargetsDestroyed && hardTargetsDestroyed) {
+			isLevel3Complete = true;
+			console.log("Level 3 Complete");
 			isGameOver = true;
 		}
 
@@ -524,9 +800,10 @@ function initGame() {
 	points = 0;
 	isLevel1Complete = false;
 	isLevel2Complete = false;
+	isLevel3Complete = false;
 	isGameOver = false;
 
-	initLevel1(); // start level1
+	initLevel1(); // start level3
 }
 
 function initLevel1() {
@@ -562,6 +839,27 @@ function initLevel2() {
 	hardEnemyMissiles = [[150, 700],[300, 700],[450,700],[600,700],[750,700]];
 
 	isLevel1Complete = true;
+}
+
+function initLevel3() {
+	currX = 502;
+	currY = 10;
+
+	missileFired = false;
+	missiles = [];
+
+	easyTargetHits = 1; // hits needed to destroy the ship
+	targetsEasy = [0,0,0,0,0]; // number of hits sustained
+	targetsEasyPosition = [[150, 500, 1],[300, 500, -1],[450,500, 1],[600,500, -1],[750,500, 1]];
+	easyEnemyMissiles = [[150, 500],[300, 500],[450,500],[600,500],[750,500]];
+
+	hardTargetHits = 2; // hits needed to destroy the ship
+	targetsHard = [0,0,0,0,0]; // number of hits sustained
+	targetsHardPosition = [[150, 700, -1],[300, 700, 1],[450,700, -1],[600,700, 1],[750,700, -1]]; // [xpos, ypos, direction]
+	hardEnemyMissiles = [[150, 700],[300, 700],[450,700],[600,700],[750,700]];
+
+	isLevel1Complete = true;
+	isLevel2Complete = true;
 }
 
 function showHelp(ctx) {
